@@ -56,7 +56,7 @@ async function scrapeYouTube() {
 
       const run = await client.actor(process.env.APIFY_ACTOR_ID).call({
         searchKeywords: keyword,   // string, not array — streamers/youtube-scraper requirement
-        maxResults: 100,
+        maxResults: 30,            // 4 keywords × 30 = 120 total, enough to get top 50 recent
         sortBy: 'SEARCH_QUERY_SORT_ORDER_DATE'
       });
 
