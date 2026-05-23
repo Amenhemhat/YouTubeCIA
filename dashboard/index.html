@@ -1,0 +1,1236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YouTube Intelligence Office — Automate&amp;Earn</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    /* ── RESET & TOKENS ────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #050810;
+      --bg-panel:    #0b0f1a;
+      --bg-card:     #0f1420;
+      --border:      rgba(212, 175, 55, 0.18);
+      --border-dim:  rgba(212, 175, 55, 0.08);
+      --gold:        #d4af37;
+      --gold-bright: #f0d060;
+      --gold-dim:    rgba(212, 175, 55, 0.4);
+      --teal:        #00897b;
+      --teal-bright: #26c6b0;
+      --teal-dim:    rgba(0, 137, 123, 0.4);
+      --burgundy:    #8b1a2e;
+      --red:         #ff4455;
+      --green:       #00e676;
+      --text:        #c8d0e0;
+      --text-dim:    #5a6070;
+      --text-bright: #ffffff;
+      --mono:        'Courier New', Courier, monospace;
+      --sans:        'Segoe UI', system-ui, sans-serif;
+    }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── SCANLINE OVERLAY ───────────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.15) 2px,
+        rgba(0,0,0,0.15) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* ── HEADER ─────────────────────────────────────────────────── */
+    .header {
+      background: linear-gradient(180deg, #0d1120 0%, var(--bg) 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .classification-badge {
+      background: var(--burgundy);
+      color: #fff;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      padding: 3px 10px;
+      border-radius: 2px;
+    }
+
+    .header-title {
+      font-family: var(--mono);
+      font-size: 13px;
+      letter-spacing: 2px;
+      color: var(--gold);
+      text-transform: uppercase;
+    }
+
+    .header-sub {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .dot.running { background: var(--gold); animation: pulse-fast 0.5s ease-in-out infinite; }
+    .dot.offline { background: var(--text-dim); animation: none; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--green); }
+      50%       { opacity: 0.4; box-shadow: none; }
+    }
+    @keyframes pulse-fast {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+
+    .btn-run {
+      background: linear-gradient(135deg, var(--gold) 0%, #a08020 100%);
+      color: #000;
+      border: none;
+      padding: 8px 20px;
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: opacity 0.2s;
+    }
+    .btn-run:hover   { opacity: 0.85; }
+    .btn-run:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── STATS BAR ──────────────────────────────────────────────── */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      border-bottom: 1px solid var(--border-dim);
+    }
+
+    .stat-cell {
+      padding: 16px 24px;
+      border-right: 1px solid var(--border-dim);
+    }
+    .stat-cell:last-child { border-right: none; }
+
+    .stat-label {
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-family: var(--mono);
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--gold);
+    }
+
+    .stat-value.teal  { color: var(--teal-bright); }
+    .stat-value.green { color: var(--green); }
+    .stat-value.red   { color: var(--red); }
+
+    .stat-sub {
+      font-size: 10px;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+
+    /* ── MAIN LAYOUT ────────────────────────────────────────────── */
+    .main {
+      padding: 24px 32px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto;
+      gap: 20px;
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+
+    .full-width { grid-column: 1 / -1; }
+
+    /* ── PANELS ─────────────────────────────────────────────────── */
+    .panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border-dim);
+      background: rgba(212, 175, 55, 0.03);
+    }
+
+    .panel-title {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 3px;
+      color: var(--gold);
+      text-transform: uppercase;
+    }
+
+    .panel-badge {
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+      background: rgba(255,255,255,0.05);
+      padding: 2px 8px;
+      border-radius: 2px;
+    }
+
+    .panel-body { padding: 20px; }
+
+    /* ── TABLE ──────────────────────────────────────────────────── */
+    .intel-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .intel-table th {
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      text-align: left;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border-dim);
+      cursor: pointer;
+      white-space: nowrap;
+      user-select: none;
+    }
+    .intel-table th:hover { color: var(--gold); }
+    .intel-table th.sorted { color: var(--gold-bright); }
+
+    .intel-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border-dim);
+      vertical-align: middle;
+      color: var(--text);
+    }
+
+    .intel-table tr:last-child td { border-bottom: none; }
+    .intel-table tr:hover td { background: rgba(212,175,55,0.03); }
+
+    .rank-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .rank-1 { background: var(--gold); color: #000; }
+    .rank-2 { background: #9e9e9e; color: #000; }
+    .rank-3 { background: #8b5a00; color: #fff; }
+    .rank-n { background: rgba(255,255,255,0.07); color: var(--text-dim); }
+
+    .video-title-cell {
+      max-width: 280px;
+    }
+    .video-title-cell a {
+      color: var(--text-bright);
+      text-decoration: none;
+      font-weight: 500;
+      display: block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .video-title-cell a:hover { color: var(--gold); }
+    .video-channel {
+      font-size: 10px;
+      color: var(--teal-bright);
+      margin-top: 2px;
+    }
+
+    .score-bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .score-bar {
+      height: 4px;
+      border-radius: 2px;
+      background: linear-gradient(90deg, var(--teal), var(--gold));
+      min-width: 4px;
+    }
+    .score-num {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--gold-dim);
+      white-space: nowrap;
+    }
+
+    .num { font-family: var(--mono); font-size: 11px; color: var(--teal-bright); }
+    .hook-tag {
+      display: inline-block;
+      background: rgba(0,137,123,0.15);
+      border: 1px solid rgba(0,137,123,0.3);
+      color: var(--teal-bright);
+      font-size: 9px;
+      font-family: var(--mono);
+      padding: 2px 6px;
+      border-radius: 2px;
+    }
+
+    .why-cell {
+      font-size: 11px;
+      color: var(--text-dim);
+      max-width: 200px;
+    }
+
+    /* Table toolbar */
+    .table-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border-dim);
+    }
+    .search-input {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border-dim);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 6px 12px;
+      border-radius: 3px;
+      width: 220px;
+      outline: none;
+    }
+    .search-input:focus { border-color: var(--gold-dim); }
+    .search-input::placeholder { color: var(--text-dim); }
+
+    .table-scroll { overflow-x: auto; }
+
+    /* ── CARDS GRID ─────────────────────────────────────────────── */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-dim);
+      border-radius: 3px;
+      padding: 14px;
+    }
+
+    .card-label {
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .card-value {
+      font-size: 13px;
+      color: var(--text-bright);
+      line-height: 1.4;
+    }
+
+    /* ── LIST ITEMS ─────────────────────────────────────────────── */
+    .intel-list { list-style: none; }
+    .intel-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border-dim);
+      font-size: 12px;
+      color: var(--text);
+    }
+    .intel-list li:last-child { border-bottom: none; }
+    .intel-list li::before {
+      content: '▸';
+      color: var(--gold);
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    /* ── ACTION PLAN CARDS ──────────────────────────────────────── */
+    .action-cards { display: flex; flex-direction: column; gap: 12px; }
+
+    .action-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-dim);
+      border-left: 3px solid var(--gold);
+      border-radius: 3px;
+      padding: 16px;
+    }
+    .action-card:nth-child(2) { border-left-color: var(--teal-bright); }
+    .action-card:nth-child(3) { border-left-color: #9c27b0; }
+    .action-card:nth-child(4) { border-left-color: var(--red); }
+    .action-card:nth-child(5) { border-left-color: #ff9800; }
+
+    .action-priority {
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--text-dim);
+      margin-bottom: 6px;
+    }
+    .action-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-bright);
+      margin-bottom: 8px;
+      line-height: 1.3;
+    }
+    .action-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .meta-tag {
+      font-family: var(--mono);
+      font-size: 9px;
+      padding: 2px 7px;
+      border-radius: 2px;
+      border: 1px solid var(--border-dim);
+      color: var(--text-dim);
+    }
+    .meta-tag.gold { border-color: var(--gold-dim); color: var(--gold); }
+    .meta-tag.teal { border-color: var(--teal-dim); color: var(--teal-bright); }
+    .action-why {
+      font-size: 12px;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+
+    /* ── KEYWORD TABLE ──────────────────────────────────────────── */
+    .kw-strength {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .kw-dots {
+      display: flex;
+      gap: 3px;
+    }
+    .kw-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--border-dim);
+    }
+    .kw-dot.filled { background: var(--gold); }
+
+    .trend-up   { color: var(--green);  font-family: var(--mono); font-size: 11px; }
+    .trend-down { color: var(--red);    font-family: var(--mono); font-size: 11px; }
+    .trend-flat { color: var(--text-dim); font-family: var(--mono); font-size: 11px; }
+
+    .opp-score {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 2px;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .opp-high   { background: rgba(0,230,118,0.15); color: var(--green); }
+    .opp-medium { background: rgba(212,175,55,0.15); color: var(--gold); }
+    .opp-low    { background: rgba(255,68,85,0.15);  color: var(--red); }
+
+    /* ── CHART CONTAINERS ───────────────────────────────────────── */
+    .chart-container { position: relative; height: 220px; }
+
+    /* ── TWO-COL SPLIT ──────────────────────────────────────────── */
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    /* ── LOADING / EMPTY STATES ─────────────────────────────────── */
+    .state-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 20px;
+      text-align: center;
+    }
+
+    .state-icon {
+      font-size: 48px;
+      margin-bottom: 20px;
+      opacity: 0.4;
+    }
+
+    .state-title {
+      font-family: var(--mono);
+      font-size: 14px;
+      letter-spacing: 3px;
+      color: var(--gold);
+      margin-bottom: 8px;
+    }
+
+    .state-sub {
+      font-size: 13px;
+      color: var(--text-dim);
+      max-width: 400px;
+    }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 2px solid var(--border-dim);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 20px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── TOAST ──────────────────────────────────────────────────── */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--bg-panel);
+      border: 1px solid var(--gold-dim);
+      color: var(--gold);
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 1px;
+      padding: 12px 20px;
+      border-radius: 3px;
+      z-index: 10000;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: transform 0.3s, opacity 0.3s;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+
+    /* ── HIGHLIGHT TEXT ─────────────────────────────────────────── */
+    .gold  { color: var(--gold); }
+    .teal  { color: var(--teal-bright); }
+    .green { color: var(--green); }
+    .red   { color: var(--red); }
+    .mono  { font-family: var(--mono); }
+
+    .section-divider {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 4px 0;
+    }
+    .section-divider span {
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 4px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .section-divider::before,
+    .section-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border-dim);
+    }
+
+    /* ── REPORT DATE BANNER ─────────────────────────────────────── */
+    .report-banner {
+      grid-column: 1 / -1;
+      background: rgba(212,175,55,0.05);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+    .report-banner .lbl { color: var(--text-dim); letter-spacing: 1px; }
+    .report-banner .val { color: var(--gold); letter-spacing: 1px; }
+
+    /* ── RESPONSIVE ─────────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .main { grid-template-columns: 1fr; padding: 16px; }
+      .stats-bar { grid-template-columns: repeat(2, 1fr); }
+      .split { grid-template-columns: 1fr; }
+      .header { padding: 0 16px; }
+      .header-title { font-size: 10px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── HEADER ──────────────────────────────────────────────────────────── -->
+<header class="header">
+  <div class="header-left">
+    <span class="classification-badge">TOP SECRET</span>
+    <div>
+      <div class="header-title">YouTube Intelligence Office</div>
+      <div class="header-sub">AUTOMATE&amp;EARN // CLEARANCE: EYES ONLY</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-indicator">
+      <div class="dot" id="statusDot"></div>
+      <span id="statusText">LOADING...</span>
+    </div>
+    <button class="btn-run" id="btnRun" onclick="triggerRun()">▶ RUN INTEL</button>
+  </div>
+</header>
+
+<!-- ── STATS BAR ────────────────────────────────────────────────────────── -->
+<div class="stats-bar" id="statsBar">
+  <div class="stat-cell">
+    <div class="stat-label">Videos Analyzed</div>
+    <div class="stat-value" id="statVideos">—</div>
+    <div class="stat-sub">this cycle</div>
+  </div>
+  <div class="stat-cell">
+    <div class="stat-label">Viral Threshold</div>
+    <div class="stat-value teal" id="statViral">—</div>
+    <div class="stat-sub">views to matter</div>
+  </div>
+  <div class="stat-cell">
+    <div class="stat-label">Intelligence Grade</div>
+    <div class="stat-value green" id="statGrade">—</div>
+    <div class="stat-sub">report quality</div>
+  </div>
+  <div class="stat-cell">
+    <div class="stat-label">Last Run</div>
+    <div class="stat-value" id="statLastRun" style="font-size:14px">—</div>
+    <div class="stat-sub">report date</div>
+  </div>
+  <div class="stat-cell">
+    <div class="stat-label">Next Run</div>
+    <div class="stat-value" id="statNextRun" style="font-size:14px">—</div>
+    <div class="stat-sub">scheduled</div>
+  </div>
+</div>
+
+<!-- ── MAIN CONTENT ──────────────────────────────────────────────────────── -->
+<div class="main" id="mainContent">
+
+  <!-- Loading state -->
+  <div class="full-width" id="loadingState">
+    <div class="state-screen">
+      <div class="spinner"></div>
+      <div class="state-title">LOADING INTELLIGENCE...</div>
+      <div class="state-sub">Connecting to intelligence database</div>
+    </div>
+  </div>
+
+  <!-- No data state -->
+  <div class="full-width" id="noDataState" style="display:none">
+    <div class="state-screen">
+      <div class="state-icon">📡</div>
+      <div class="state-title">NO ACTIVE REPORT</div>
+      <div class="state-sub">No intelligence report found. Click RUN INTEL to gather data from YouTube. Takes approximately 2–3 minutes.</div>
+    </div>
+  </div>
+
+  <!-- ── REPORT CONTENT ── hidden until data loads ── -->
+  <div id="reportContent" style="display:contents">
+
+    <!-- Key insight banner -->
+    <div class="report-banner full-width" id="bannerBlock" style="display:none">
+      <div><span class="lbl">KEY INSIGHT // </span><span class="val" id="keyInsight">—</span></div>
+      <div><span class="lbl">NICHE // </span><span class="val">AI Automation &amp; Make Money with AI</span></div>
+    </div>
+
+    <!-- ── TOP 20 VIDEOS ──────────────────────────────────────── -->
+    <div class="panel full-width" id="videosPanel" style="display:none">
+      <div class="panel-header">
+        <span class="panel-title">▌ Top 20 Performing Videos — Last 14 Days</span>
+        <span class="panel-badge" id="videosCount">0 videos</span>
+      </div>
+      <div class="table-toolbar">
+        <input class="search-input" type="text" id="videoSearch" placeholder="Search title or channel..." oninput="filterTable()" />
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)">Click column headers to sort</span>
+      </div>
+      <div class="table-scroll">
+        <table class="intel-table" id="videosTable">
+          <thead>
+            <tr>
+              <th onclick="sortTable('rank')">#</th>
+              <th onclick="sortTable('title')">Title / Channel</th>
+              <th onclick="sortTable('views')">Views ↕</th>
+              <th onclick="sortTable('likes')">Likes ↕</th>
+              <th onclick="sortTable('comments')">Comments ↕</th>
+              <th onclick="sortTable('performance_score')">Score ↕</th>
+              <th>Hook Type</th>
+              <th>Why It Worked</th>
+            </tr>
+          </thead>
+          <tbody id="videosBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section-divider full-width"><span>Intelligence Analysis</span></div>
+
+    <!-- ── HOOK ANALYSIS ─────────────────────────────────────── -->
+    <div class="panel" id="hookPanel" style="display:none">
+      <div class="panel-header">
+        <span class="panel-title">▌ Hook Intelligence</span>
+        <span class="panel-badge">What makes people click</span>
+      </div>
+      <div class="panel-body">
+        <div class="split">
+          <div>
+            <div class="card-label" style="margin-bottom:10px">Top Hook Formulas</div>
+            <ul class="intel-list" id="hookFormulas"></ul>
+          </div>
+          <div>
+            <div class="card-label" style="margin-bottom:10px">Emotional Triggers Working</div>
+            <ul class="intel-list" id="emotionalTriggers"></ul>
+          </div>
+        </div>
+        <div style="margin-top:16px">
+          <div class="card-label" style="margin-bottom:10px; color:var(--red)">Hooks to Avoid</div>
+          <ul class="intel-list" id="hooksToAvoid"></ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TITLE INTELLIGENCE ────────────────────────────────── -->
+    <div class="panel" id="titlePanel" style="display:none">
+      <div class="panel-header">
+        <span class="panel-title">▌ Title Intelligence</span>
+        <span class="panel-badge">What gets clicked</span>
+      </div>
+      <div class="panel-body">
+        <div class="cards-grid" id="titleCards"></div>
+        <div style="margin-top:16px">
+          <div class="card-label" style="margin-bottom:10px">Title Formulas Ranked</div>
+          <ul class="intel-list" id="titleFormulas"></ul>
+        </div>
+        <div style="margin-top:16px">
+          <div class="card-label" style="margin-bottom:8px">Power Words</div>
+          <div id="powerWords" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── KEYWORD INTELLIGENCE ──────────────────────────────── -->
+    <div class="panel full-width" id="keywordPanel" style="display:none">
+      <div class="panel-header">
+        <span class="panel-title">▌ Keyword Intelligence</span>
+        <span class="panel-badge">Signal strength &amp; opportunity</span>
+      </div>
+      <div class="panel-body">
+        <table class="intel-table">
+          <thead>
+            <tr>
+              <th>Keyword</th>
+              <th>Strength</th>
+              <th>Trend</th>
+              <th>Saturation</th>
+              <th>Opportunity</th>
+            </tr>
+          </thead>
+          <tbody id="keywordBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── CONTENT INTELLIGENCE ──────────────────────────────── -->
+    <div class="panel" id="contentPanel" style="display:none">
+      <div class="panel-header">
+        <span class="panel-title">▌ Content Intelligence</span>
+        <span class="panel-badge">Format &amp; angle data</span>
+      </div>
+      <div class="panel-body">
+        <div class="cards-grid" id="contentCards"></div>
+        <div class="split" style="margin-top:16px">
+          <div>
+            <div class="card-label" style="margin-bottom:10px; color:var(--green)">Content Gaps (Opportunity)</div>
+            <ul class="intel-list" id="contentGaps"></ul>
+          </div>
+          <div>
+            <div class="card-label" style="margin-bottom:10px; color:var(--red)">What Is Dying</div>
+            <ul class="intel-list" id="whatIsDying"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CHANNEL INTELLIGENCE ──────────────────────────────── -->
+    <div class="panel" id="channelPanel" style="display:none">
+      <div class="panel-header">
+        <span class="panel-title">▌ Channel Intelligence</span>
+        <span class="panel-badge">Competitors &amp; threats</span>
+      </div>
+      <div class="panel-body">
+        <div class="split">
+          <div>
+            <div class="card-label" style="margin-bottom:10px">Top Channels to Watch</div>
+            <ul class="intel-list" id="topChannels"></ul>
+          </div>
+          <div>
+            <div class="card-label" style="margin-bottom:10px; color:var(--teal-bright)">Emerging Channels</div>
+            <ul class="intel-list" id="emergingChannels"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-divider full-width"><span>Action Intelligence</span></div>
+
+    <!-- ── ACTION PLAN ───────────────────────────────────────── -->
+    <div class="panel full-width" id="actionPanel" style="display:none">
+      <div class="panel-header">
+        <span class="panel-title">▌ Your 5-Video Action Plan</span>
+        <span class="panel-badge">Execute immediately</span>
+      </div>
+      <div class="panel-body">
+        <div class="action-cards" id="actionCards"></div>
+      </div>
+    </div>
+
+    <!-- ── THREATS & OPPORTUNITIES ───────────────────────────── -->
+    <div class="panel full-width" id="threatPanel" style="display:none">
+      <div class="panel-header">
+        <span class="panel-title">▌ Threats &amp; Opportunities</span>
+        <span class="panel-badge">Strategic intelligence</span>
+      </div>
+      <div class="panel-body">
+        <div class="split" style="grid-template-columns:1fr 1fr 1fr; gap:20px;">
+          <div>
+            <div class="card-label" style="margin-bottom:10px; color:var(--green)">🟢 Immediate Opportunities</div>
+            <ul class="intel-list" id="opportunities"></ul>
+          </div>
+          <div>
+            <div class="card-label" style="margin-bottom:10px; color:var(--red)">🔴 Threats to Monitor</div>
+            <ul class="intel-list" id="threats"></ul>
+          </div>
+          <div>
+            <div class="card-label" style="margin-bottom:10px; color:var(--teal-bright)">🔵 Blue Ocean Angles</div>
+            <ul class="intel-list" id="blueOcean"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end reportContent -->
+
+</div><!-- end main -->
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── State ─────────────────────────────────────────────────────────────────
+let reportData    = null;
+let allVideos     = [];
+let sortKey       = 'rank';
+let sortDir       = 1;
+let pollInterval  = null;
+
+// ─── Init ───────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', loadReport);
+
+async function loadReport() {
+  try {
+    const res  = await fetch('/api/current');
+    const json = await res.json();
+
+    if (json.status === 'no_data') {
+      showNoData();
+      return;
+    }
+
+    reportData = json.report;
+    renderAll(reportData);
+  } catch (e) {
+    showNoData();
+  }
+}
+
+// ─── Render ─────────────────────────────────────────────────────────────────
+function renderAll(report) {
+  const a = report.analysis;
+  if (!a) { showNoData(); return; }
+
+  // Stats bar
+  document.getElementById('statVideos').textContent  = a.report_summary?.total_videos_analyzed || report.video_count || '—';
+  document.getElementById('statViral').textContent   = fmtNum(a.report_summary?.viral_threshold_views) || a.report_summary?.viral_threshold || '—';
+  document.getElementById('statGrade').textContent   = a.report_summary?.intelligence_grade || '—';
+  document.getElementById('statLastRun').textContent = fmtDate(report.run_date);
+  document.getElementById('statNextRun').textContent = nextRunDate(report.run_date);
+
+  // Key insight
+  if (a.report_summary?.key_insight) {
+    document.getElementById('keyInsight').textContent = a.report_summary.key_insight;
+    show('bannerBlock');
+  }
+
+  // Status
+  setStatus('OPERATIONAL', 'online');
+
+  // Panels
+  renderVideosTable(a.top_20_videos || []);
+  renderHooks(a.hook_analysis || {});
+  renderTitles(a.title_intelligence || {});
+  renderKeywords(a.keyword_intelligence || []);
+  renderContent(a.content_intelligence || {});
+  renderChannels(a.channel_intelligence || {});
+  renderActionPlan(a.my_action_plan || []);
+  renderThreats(a.threats_and_opportunities || {});
+
+  // Hide loading, show data
+  hide('loadingState');
+  hide('noDataState');
+}
+
+// ─── Videos table ───────────────────────────────────────────────────────────
+function renderVideosTable(videos) {
+  allVideos = videos;
+  show('videosPanel');
+  document.getElementById('videosCount').textContent = videos.length + ' videos';
+  renderTableRows(videos);
+}
+
+function renderTableRows(videos) {
+  const maxScore = Math.max(...videos.map(v => v.performance_score || 0), 1);
+  const body     = document.getElementById('videosBody');
+  body.innerHTML = '';
+
+  videos.forEach(v => {
+    const rankClass = v.rank === 1 ? 'rank-1' : v.rank === 2 ? 'rank-2' : v.rank === 3 ? 'rank-3' : 'rank-n';
+    const barPct    = Math.round(((v.performance_score || 0) / maxScore) * 100);
+    const tr        = document.createElement('tr');
+
+    tr.innerHTML = `
+      <td><span class="rank-badge ${rankClass}">${v.rank}</span></td>
+      <td class="video-title-cell">
+        <a href="${v.url || '#'}" target="_blank" title="${esc(v.title)}">${esc(v.title)}</a>
+        <div class="video-channel">${esc(v.channel)}</div>
+      </td>
+      <td class="num">${fmtNum(v.views)}</td>
+      <td class="num">${fmtNum(v.likes)}</td>
+      <td class="num">${fmtNum(v.comments)}</td>
+      <td>
+        <div class="score-bar-wrap">
+          <div class="score-bar" style="width:${barPct}px"></div>
+          <span class="score-num">${fmtNum(v.performance_score)}</span>
+        </div>
+      </td>
+      <td><span class="hook-tag">${esc(v.hook_type || '—')}</span></td>
+      <td class="why-cell">${esc(v.why_it_worked || '—')}</td>
+    `;
+    body.appendChild(tr);
+  });
+}
+
+function filterTable() {
+  const q = document.getElementById('videoSearch').value.toLowerCase();
+  const filtered = allVideos.filter(v =>
+    (v.title   || '').toLowerCase().includes(q) ||
+    (v.channel || '').toLowerCase().includes(q)
+  );
+  renderTableRows(filtered);
+}
+
+function sortTable(key) {
+  if (sortKey === key) sortDir = -sortDir;
+  else { sortKey = key; sortDir = 1; }
+
+  const sorted = [...allVideos].sort((a, b) => {
+    const av = typeof a[key] === 'number' ? a[key] : (a[key] || '').toString().toLowerCase();
+    const bv = typeof b[key] === 'number' ? b[key] : (b[key] || '').toString().toLowerCase();
+    return av > bv ? sortDir : av < bv ? -sortDir : 0;
+  });
+
+  document.querySelectorAll('.intel-table th').forEach(th => th.classList.remove('sorted'));
+  renderTableRows(sorted);
+}
+
+// ─── Hooks ──────────────────────────────────────────────────────────────────
+function renderHooks(h) {
+  show('hookPanel');
+  fillList('hookFormulas',      h.top_hook_formulas || []);
+  fillList('emotionalTriggers', h.emotional_triggers_working || []);
+  fillList('hooksToAvoid',      h.hooks_to_avoid || []);
+}
+
+// ─── Titles ─────────────────────────────────────────────────────────────────
+function renderTitles(t) {
+  show('titlePanel');
+  const cards = [
+    { label: 'Optimal Length', value: t.optimal_title_length || '—' },
+    ...( t.dominant_patterns || [] ).map(p => ({ label: 'Pattern', value: p }))
+  ];
+  fillCards('titleCards', cards);
+  fillList('titleFormulas', t.title_formulas_ranked || []);
+
+  const pw = document.getElementById('powerWords');
+  pw.innerHTML = '';
+  (t.power_words || []).forEach(w => {
+    const span = document.createElement('span');
+    span.className = 'hook-tag';
+    span.textContent = w;
+    pw.appendChild(span);
+  });
+}
+
+// ─── Keywords ───────────────────────────────────────────────────────────────
+function renderKeywords(kws) {
+  show('keywordPanel');
+  const body = document.getElementById('keywordBody');
+  body.innerHTML = '';
+
+  kws.forEach(k => {
+    const score = parseInt(k.opportunity_score) || 0;
+    const oppClass = score >= 7 ? 'opp-high' : score >= 4 ? 'opp-medium' : 'opp-low';
+    const trendClass = /up|ris|grow/i.test(k.trend) ? 'trend-up' : /down|fall|declin/i.test(k.trend) ? 'trend-down' : 'trend-flat';
+    const trendIcon  = /up|ris|grow/i.test(k.trend) ? '▲' : /down|fall|declin/i.test(k.trend) ? '▼' : '→';
+
+    const strength = parseInt(k.strength) || 5;
+    const dots = Array.from({length:10}, (_, i) =>
+      `<div class="kw-dot ${i < strength ? 'filled' : ''}"></div>`
+    ).join('');
+
+    body.innerHTML += `
+      <tr>
+        <td style="color:var(--text-bright);font-weight:500">${esc(k.keyword)}</td>
+        <td><div class="kw-dots">${dots}</div></td>
+        <td><span class="${trendClass}">${trendIcon} ${esc(k.trend)}</span></td>
+        <td style="color:var(--text-dim);font-size:11px">${esc(k.saturation)}</td>
+        <td><span class="opp-score ${oppClass}">${score}/10</span></td>
+      </tr>
+    `;
+  });
+}
+
+// ─── Content ────────────────────────────────────────────────────────────────
+function renderContent(c) {
+  show('contentPanel');
+  fillCards('contentCards', [
+    { label: 'Optimal Length',  value: c.optimal_video_length || '—' },
+    { label: 'Dominant Angles', value: (c.content_angles_dominating || []).join(', ') || '—' }
+  ]);
+  fillList('contentGaps',  c.content_gaps  || []);
+  fillList('whatIsDying',  c.what_is_dying || []);
+}
+
+// ─── Channels ───────────────────────────────────────────────────────────────
+function renderChannels(ch) {
+  show('channelPanel');
+  fillList('topChannels',      ch.top_channels_to_watch || []);
+  fillList('emergingChannels', ch.emerging_channels || []);
+}
+
+// ─── Action plan ────────────────────────────────────────────────────────────
+function renderActionPlan(plan) {
+  show('actionPanel');
+  const container = document.getElementById('actionCards');
+  container.innerHTML = '';
+
+  plan.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'action-card';
+    div.innerHTML = `
+      <div class="action-priority">PRIORITY ${item.priority} // ${esc(item.keyword_to_target || '')}</div>
+      <div class="action-title">${esc(item.video_title)}</div>
+      <div class="action-meta">
+        <span class="meta-tag gold">Hook: ${esc(item.target_hook || '—')}</span>
+        <span class="meta-tag teal">Length: ${esc(item.optimal_length || '—')}</span>
+        <span class="meta-tag">Est. Views: ${esc(item.estimated_views || '—')}</span>
+        <span class="meta-tag">${esc(item.content_angle || '')}</span>
+      </div>
+      <div class="action-why">${esc(item.why_this_will_work)}</div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+// ─── Threats ────────────────────────────────────────────────────────────────
+function renderThreats(t) {
+  show('threatPanel');
+  fillList('opportunities', t.immediate_opportunities || []);
+  fillList('threats',       t.threats_to_monitor || []);
+  fillList('blueOcean',     t.blue_ocean_angles || []);
+}
+
+// ─── Trigger run ────────────────────────────────────────────────────────────
+async function triggerRun() {
+  const btn = document.getElementById('btnRun');
+  btn.disabled = true;
+  btn.textContent = '⏳ RUNNING...';
+  setStatus('GATHERING INTEL...', 'running');
+  showToast('Intelligence gathering started — check back in ~3 minutes');
+
+  try {
+    await fetch('/api/run', { method: 'POST' });
+    startPolling();
+  } catch (e) {
+    showToast('Failed to trigger run');
+    btn.disabled = false;
+    btn.textContent = '▶ RUN INTEL';
+  }
+}
+
+function startPolling() {
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(async () => {
+    try {
+      const res  = await fetch('/api/status');
+      const json = await res.json();
+      if (!json.running) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+        await loadReport();
+        document.getElementById('btnRun').disabled = false;
+        document.getElementById('btnRun').textContent = '▶ RUN INTEL';
+        showToast('New intelligence report loaded ✓');
+      }
+    } catch {}
+  }, 15000); // poll every 15s
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+function show(id) { const el = document.getElementById(id); if (el) el.style.display = ''; }
+function hide(id) { const el = document.getElementById(id); if (el) el.style.display = 'none'; }
+
+function setStatus(text, state) {
+  document.getElementById('statusText').textContent = text;
+  const dot = document.getElementById('statusDot');
+  dot.className = 'dot ' + (state === 'running' ? 'running' : state === 'online' ? '' : 'offline');
+}
+
+function showNoData() {
+  hide('loadingState');
+  show('noDataState');
+  setStatus('NO DATA', 'offline');
+}
+
+function esc(str) {
+  if (!str && str !== 0) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function fmtNum(n) {
+  const num = parseInt(n);
+  if (isNaN(num)) return n || '—';
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000)    return (num / 1000).toFixed(1) + 'K';
+  return num.toLocaleString();
+}
+
+function fmtDate(dateStr) {
+  if (!dateStr) return '—';
+  return new Date(dateStr).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+}
+
+function nextRunDate(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + 14);
+  return fmtDate(d);
+}
+
+function fillList(id, items) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = '';
+  items.forEach(item => {
+    const li = document.createElement('li');
+    li.textContent = item;
+    el.appendChild(li);
+  });
+}
+
+function fillCards(id, cards) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = '';
+  cards.forEach(c => {
+    if (!c.value) return;
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.innerHTML = `<div class="card-label">${esc(c.label)}</div><div class="card-value">${esc(c.value)}</div>`;
+    el.appendChild(div);
+  });
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 4000);
+}
+</script>
+</body>
+</html>
