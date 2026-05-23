@@ -54,11 +54,11 @@ async function scrapeYouTube() {
     try {
       console.log(`[Apify] Scraping: "${keyword}"`);
 
-      const run = await client.actor(process.env.APIFY_ACTOR_ID).call({
-        searchKeywords: [keyword],
-        maxResults: 100,
-        sortBy: 'date'          // most recent first so we filter efficiently
-      });
+    const run = await client.actor(process.env.APIFY_ACTOR_ID).call({
+      searchKeywords: [keyword],
+      maxResults: 100,
+      sortBy: 'SEARCH_QUERY_SORT_ORDER_DATE'
+    });
 
       const { items } = await client.dataset(run.defaultDatasetId).listItems();
 
