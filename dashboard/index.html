@@ -150,8 +150,37 @@
       border-radius: 3px;
       transition: opacity 0.2s;
     }
-    .btn-run:hover   { opacity: 0.85; }
+    .btn-run:hover    { opacity: 0.85; }
     .btn-run:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── REPORT SELECTOR ────────────────────────────────────────── */
+    .report-selector {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .report-selector label {
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .report-select {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      color: var(--gold);
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 6px 10px;
+      border-radius: 3px;
+      cursor: pointer;
+      outline: none;
+      max-width: 200px;
+    }
+    .report-select:focus { border-color: var(--gold-dim); }
+    .report-select option { background: #0b0f1a; color: var(--text); }
 
     /* ── STATS BAR ──────────────────────────────────────────────── */
     .stats-bar {
@@ -638,6 +667,12 @@
     </div>
   </div>
   <div class="header-right">
+    <div class="report-selector">
+      <label>Report</label>
+      <select class="report-select" id="reportSelect" onchange="switchReport(this.value)">
+        <option value="">Loading...</option>
+      </select>
+    </div>
     <div class="status-indicator">
       <div class="dot" id="statusDot"></div>
       <span id="statusText">LOADING...</span>
@@ -895,7 +930,10 @@ let sortDir       = 1;
 let pollInterval  = null;
 
 // ─── Init ───────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', loadReport);
+document.addEventListener('DOMContentLoaded', () => {
+  loadReport();
+  loadHistory();
+});
 
 async function loadReport() {
   try {
@@ -911,6 +949,57 @@ async function loadReport() {
     renderAll(reportData);
   } catch (e) {
     showNoData();
+  }
+}
+
+// ─── History dropdown ───────────────────────────────────────────────────────
+async function loadHistory() {
+  try {
+    const res     = await fetch('/api/history');
+    const json    = await res.json();
+    const select  = document.getElementById('reportSelect');
+    const reports = json.history || [];
+
+    select.innerHTML = '';
+
+    if (reports.length === 0) {
+      select.innerHTML = '<option value="">No reports yet</option>';
+      return;
+    }
+
+    reports.forEach((r, i) => {
+      const opt    = document.createElement('option');
+      opt.value    = r.id;
+      const date   = fmtDate(r.run_date);
+      const label  = i === 0
+        ? `${date} — LATEST`
+        : `${date}`;
+      opt.textContent = label;
+      if (r.is_active) opt.selected = true;
+      select.appendChild(opt);
+    });
+  } catch (e) {
+    document.getElementById('reportSelect').innerHTML = '<option value="">—</option>';
+  }
+}
+
+async function switchReport(id) {
+  if (!id) return;
+  hide('loadingState');
+  hide('noDataState');
+
+  // Show a brief loading flash
+  setStatus('LOADING REPORT...', 'running');
+
+  try {
+    const res  = await fetch(`/api/report/${id}`);
+    const json = await res.json();
+    if (json.status === 'success') {
+      renderAll(json.report);
+      showToast('Report loaded ✓');
+    }
+  } catch (e) {
+    showToast('Failed to load report');
   }
 }
 
@@ -1148,6 +1237,7 @@ function startPolling() {
         clearInterval(pollInterval);
         pollInterval = null;
         await loadReport();
+        await loadHistory();
         document.getElementById('btnRun').disabled = false;
         document.getElementById('btnRun').textContent = '▶ RUN INTEL';
         showToast('New intelligence report loaded ✓');

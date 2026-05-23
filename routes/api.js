@@ -2,7 +2,7 @@ const express = require('express');
 const router  = express.Router();
 const { scrapeYouTube }                          = require('../services/apify');
 const { analyzeVideos }                          = require('../services/claude');
-const { saveReport, getActiveReport, getReportHistory } = require('../services/db');
+const { saveReport, getActiveReport, getReportHistory, getReportById } = require('../services/db');
 
 let isRunning = false;  // prevent concurrent runs
 
@@ -52,6 +52,17 @@ router.get('/history', async (req, res) => {
   try {
     const history = await getReportHistory();
     res.json({ status: 'success', history });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/report/:id — fetch a specific historical report
+router.get('/report/:id', async (req, res) => {
+  try {
+    const report = await getReportById(parseInt(req.params.id));
+    if (!report) return res.status(404).json({ error: 'Report not found' });
+    res.json({ status: 'success', report });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

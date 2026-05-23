@@ -43,9 +43,17 @@ async function getActiveReport() {
 
 async function getReportHistory() {
   const result = await pool.query(
-    'SELECT id, run_date, video_count, is_active FROM intelligence_reports ORDER BY created_at DESC LIMIT 10'
+    'SELECT id, run_date, video_count, is_active FROM intelligence_reports ORDER BY created_at DESC LIMIT 20'
   );
   return result.rows;
 }
 
-module.exports = { initDB, saveReport, getActiveReport, getReportHistory };
+async function getReportById(id) {
+  const result = await pool.query(
+    'SELECT * FROM intelligence_reports WHERE id = $1',
+    [id]
+  );
+  return result.rows[0] || null;
+}
+
+module.exports = { initDB, saveReport, getActiveReport, getReportHistory, getReportById };
